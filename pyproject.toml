@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "news-kg"
+version = "0.1.0"
+description = "Structured information extraction and entity resolution over news articles"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.6",
+    "PyYAML>=6.0",
+    "python-dotenv>=1.0",
+    "rich>=13.0",
+    "rapidfuzz>=3.0",
+]
+
+[project.optional-dependencies]
+nlp = ["spacy==3.8.7"]
+dev = ["pytest>=8.0"]
+
+# Installing the project with `pip install -e .` puts `src` on the import path
+# permanently. This is why every module and test can `from src.schemas import
+# Document` regardless of the working directory, with no sys.path hacking and
+# no PYTHONPATH environment variable to remember.
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::FutureWarning", "ignore::DeprecationWarning"]
+
+# --- Editor / type-checker configuration -----------------------------------
+# This project uses a "src package" layout: the importable package IS `src`,
+# and the import root is the PROJECT ROOT (so `from src.schemas import ...`).
+# Type checkers default to assuming `src/` itself is the import root, which
+# makes them report a false "cannot find module src.config". Pointing them at
+# the project root fixes editor squiggles without changing runtime behaviour.
+[tool.pyright]
+extraPaths = ["."]
+venvPath = "."
+venv = ".venv"
+
+[tool.ty.environment]
+root = ["."]
+python = ".venv"

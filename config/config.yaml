@@ -1,0 +1,59 @@
+# ---------------------------------------------------------------------------
+# Central configuration. NOTHING downstream may hardcode a path or a model name.
+# Every value here can be overridden by an environment variable using the
+# pattern NEWSKG__<SECTION>__<KEY> (see .env.example).
+# ---------------------------------------------------------------------------
+
+paths:
+  # All paths are resolved relative to the PROJECT ROOT, not the current
+  # working directory, so scripts behave the same no matter where you run them.
+  data_dir: data
+  raw_dir: data/raw
+  processed_dir: data/processed
+  sample_dir: data/sample
+  db_path: data/knowledge_graph.db
+
+ingestion:
+  # The corpus we ingest from. Phase 1 uses a local, version-controlled corpus
+  # so the whole pipeline is reproducible without a network or a scraper.
+  source_file: data/sample/articles.jsonl
+  # Drop articles whose body is shorter than this (boilerplate / failed fetches).
+  min_body_chars: 120
+
+preprocessing:
+  # Unicode normalisation form. NFKC folds "compatibility" characters
+  # (e.g. non-breaking space -> space, ﬁ ligature -> fi).
+  unicode_form: NFKC
+  strip_html: true
+  # Sentence segmentation backend: "spacy" (better) or "regex" (zero-dependency
+  # fallback). Configurable so the pipeline still runs if spaCy is unavailable.
+  sentence_segmenter: spacy
+  spacy_model: en_core_web_sm
+
+ner:
+  # Which extractors run, and in what order. Order does not affect the merge
+  # result (the trust matrix decides that), but it does affect logging order.
+  #   spacy       - fast, 18 types, the only model with EVENT, gives us the
+  #                 dependency parse Phase 5 needs anyway.
+  #   transformer - ~17x slower on CPU but clearly better on PERSON/ORG.
+  #   gazetteer   - supplies COUNTRY, ROLE and TOPIC, which no model provides.
+  # Drop "transformer" for a fast first pass over a large archive.
+  extractors:
+    - spacy
+    - transformer
+    - gazetteer
+
+  transformer_model: dslim/bert-base-NER
+  # -1 = CPU, 0 = first CUDA device.
+  device: -1
+  batch_size: 8
+  # Confidence floor applied AFTER merging. 0.0 keeps everything; raise it to
+  # trade recall for precision. Note this only filters model predictions
+  # meaningfully -- rule-based scores are fixed constants, not probabilities.
+  min_score: 0.0
+
+logging:
+  level: INFO
+  # "rich" for colourised human-readable console logs, "json" for machine-
+  # parseable logs you would ship to a log aggregator in production.
+  format: rich

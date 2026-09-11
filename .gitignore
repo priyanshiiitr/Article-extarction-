@@ -1,0 +1,21 @@
+# Environments
+.venv/
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Data: raw + processed are reproducible from scripts/make_sample_data.py
+# We DO commit data/sample (tiny, human-readable, used by tests).
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Local databases & model caches
+*.db
+*.sqlite3
+.models_cache/
