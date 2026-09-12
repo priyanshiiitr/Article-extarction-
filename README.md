@@ -23,11 +23,12 @@ articles → ingestion → preprocessing → NER → coreference → relations
 | 1. Ingestion | done | `src/ingestion/` |
 | 2. Preprocessing (clean + sentence segmentation) | done | `src/preprocessing/` |
 | 3. Named entity recognition | done | `src/ner/` |
-| 4. Coreference resolution | next | `src/coreference/` |
-| 5. Relation extraction | planned | `src/relation_extraction/` |
-| 6. Entity resolution | planned | `src/entity_resolution/` |
-| 7–9. Storage + query | planned | `src/storage/` |
-| 10. Evaluation | planned | `tests/`, `scripts/` |
+| 4. Coreference resolution | done | `src/coreference/` |
+| 5. Relation extraction | done | `src/relation_extraction/` |
+| 6. Entity resolution | done | `src/entity_resolution/` |
+| 7–9. Storage + query | done | `src/storage/` |
+| 10. Evaluation | done | `src/evaluation/` |
+| 11. Production architecture | done | [`docs/PRODUCTION.md`](docs/PRODUCTION.md) |
 
 ### The two ideas that hold it together
 
@@ -86,6 +87,13 @@ python scripts/make_sample_data.py     # generate the reproducible corpus
 python scripts/run_ingest.py           # → data/raw/articles.jsonl
 python scripts/run_preprocess.py       # → data/processed/documents.jsonl
 python scripts/run_ner.py              # → data/processed/documents_ner.jsonl
+python scripts/run_coref.py            # → data/processed/documents_coref.jsonl
+python scripts/run_relations.py        # → data/processed/documents_relations.jsonl
+python scripts/run_entity_resolution.py # → data/processed/entities.jsonl + review_queue.jsonl
+python scripts/build_graph.py          # → data/knowledge_graph.db
+python scripts/query.py                # answers the five demo questions
+python scripts/query.py "Lalit Modi"    # any entity, by name or alias
+python scripts/evaluate.py             # scores against the gold set
 pytest -q
 ```
 
@@ -136,8 +144,35 @@ src/ner/gazetteer.py      COUNTRY, ROLE, EVENT, TOPIC — types no model has
 src/ner/merge.py          trust matrix that resolves extractor disagreements
 src/ner/pipeline.py       Phase 3 orchestration
 
+src/coreference/base.py               resolver Protocol + cluster builder + alignment
+src/coreference/fastcoref_resolver.py neural coref (LingMess, 590M params)
+src/coreference/rule_resolver.py      heuristic baseline (union-find + recency)
+src/coreference/pipeline.py           Phase 4 orchestration
+
+src/relation_extraction/base.py        Protocol, Relation builder, argument resolution
+src/relation_extraction/patterns.py    juxtaposition relations (role/demonym/of)
+src/relation_extraction/dependency.py  verb relations from the dependency parse
+src/relation_extraction/pipeline.py    Phase 5 orchestration + deduplication
+
+src/entity_resolution/normalize.py   surface form -> comparable string
+src/entity_resolution/profiles.py    mentions -> local entities (+ bare-surname attachment)
+src/entity_resolution/blocking.py    candidate generation, O(N^2) -> O(N x block)
+src/entity_resolution/embeddings.py  context vectors (e5-small, masked mean pooling)
+src/entity_resolution/features.py    pairwise signals + hard vetoes
+src/entity_resolution/scoring.py     weight table + decision bands
+src/entity_resolution/resolver.py    clustering + cluster soundness validation
+
+src/storage/schema.py     SQLite DDL: two-level design + indexes
+src/storage/store.py      loaders, noisy-OR edge aggregation
+src/storage/queries.py    the query layer (parameterised, with provenance)
+src/evaluation/metrics.py P/R/F1, MUC, B-cubed, false merge vs split
+src/evaluation/evaluate.py scoring against the gold set
+
+data/sample/gold/         manually labelled gold standard (3 articles)
+docs/PRODUCTION.md        Phase 11: scaling, LLM usage, what to build next
+
 scripts/                  runnable entry points
-tests/                    58 tests
+tests/                    175 tests
 ```
 
 ---
@@ -174,3 +209,37 @@ Stated explicitly rather than discovered later:
   a fixed list cannot have good recall. It buys precision on this corpus only.
 - **Confidence scores are not calibrated.** Neural networks are systematically
   overconfident; treat scores as a ranking signal, not as probabilities.
+- **Coreference is slow.** LingMess is 590M parameters and takes roughly 13
+  seconds per document on CPU. On a large corpus this dominates runtime; the
+  `fcoref` distilled model or a GPU is the answer. Set
+  `coreference.backend: rules` for a fast, clearly worse baseline.
+- **The rule-based coref backend ignores syntax.** In "Modi met Putin. He
+  said..." it links "He" to Putin (nearest) rather than Modi (the subject).
+  This failure is pinned by a test so it stays a known limitation.
+- **ER weights and thresholds are hand-set.** They encode reasoning, not
+  measurement. The correct method is logistic regression on labelled pairs
+  (the Fellegi-Sunter framework) with the threshold chosen from a
+  precision/recall curve. Phase 10 builds that labelled data.
+- **Context embeddings are only weakly discriminative.** Measured raw
+  cosines between news contexts sit in 0.88-0.93 whether the people are the
+  same or not, so the feature is calibrated by RANK within the candidate
+  set. That makes it batch-relative; production would calibrate against a
+  fixed reference distribution.
+- **Transitive closure can chain merges.** Mitigated by hard vetoes,
+  intra-document bare-surname attachment, and post-hoc cluster soundness
+  validation — not eliminated. Correlational clustering is the principled fix.
+- **The relation schema is closed.** Nine predicates, and a relation outside
+  that set is simply not extracted. An open schema is the main argument for
+  LLM-based extraction.
+- **Verb triggers are a fixed list.** "sat down with" means "met" only if
+  someone adds it. A supervised model learns paraphrase from data; this is
+  the clearest upgrade path once labelled data exists.
+- **Modality is penalised, not modelled.** "Modi will meet Putin" is stored
+  with reduced confidence rather than flagged as an unrealised event.
+  Proper handling needs factuality classification.
+- **Duplicate facts across mention forms survive.** `(Jaishankar) met
+  (Lavrov)` and `(Jaishankar) met (Sergey Lavrov)` are the same fact, but
+  dedup compares surface strings. Phase 6 is what fixes this.
+- **Windows + fastcoref needs a `__main__` guard.** fastcoref tokenises via
+  HuggingFace `datasets` multiprocessing; without the guard, child processes
+  re-import the entry point and the run exits silently with code 0.

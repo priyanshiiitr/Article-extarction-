@@ -63,6 +63,27 @@ class NerConfig(BaseModel):
     min_score: float = 0.0
 
 
+class CoreferenceConfig(BaseModel):
+    backend: str = "fastcoref"
+    model: str = "lingmess"
+    device: str = "cpu"
+    batch_size: int = 4
+    max_chars: int = 20000
+    max_sentence_distance: int = 2
+
+
+class RelationsConfig(BaseModel):
+    extractors: list[str] = Field(default_factory=lambda: ["pattern", "dependency"])
+    min_confidence: float = 0.35
+
+
+class EntityResolutionConfig(BaseModel):
+    use_embeddings: bool = True
+    embedding_model: str = "intfloat/multilingual-e5-small"
+    match_threshold: float = 0.55
+    review_threshold: float = 0.35
+
+
 class LoggingConfig(BaseModel):
     level: str = "INFO"
     format: str = "rich"
@@ -81,6 +102,9 @@ class Config(BaseModel):
     ingestion: IngestionConfig = Field(default_factory=IngestionConfig)
     preprocessing: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
     ner: NerConfig = Field(default_factory=NerConfig)
+    coreference: CoreferenceConfig = Field(default_factory=CoreferenceConfig)
+    relations: RelationsConfig = Field(default_factory=RelationsConfig)
+    entity_resolution: EntityResolutionConfig = Field(default_factory=EntityResolutionConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
     def path(self, relative: str) -> Path:

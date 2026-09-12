@@ -52,6 +52,43 @@ ner:
   # meaningfully -- rule-based scores are fixed constants, not probabilities.
   min_score: 0.0
 
+coreference:
+  # "fastcoref" = neural (LingMess, 590M params, ~81 F1 on OntoNotes).
+  # "rules"     = heuristic baseline: no download, instant, clearly worse.
+  backend: fastcoref
+  # "lingmess" (accurate) or "fcoref" (distilled, faster, a few F1 lower).
+  model: lingmess
+  device: cpu
+  batch_size: 4
+  # Coreference is O(mentions^2). Truncate pathological documents rather than
+  # letting one of them stall an entire batch.
+  max_chars: 20000
+  # Rules backend only: how many sentences back a pronoun may look.
+  max_sentence_distance: 2
+
+relations:
+  # "pattern"    - juxtaposition relations (holds_position, represents,
+  #                works_for). No verb exists for a parser to hang off.
+  # "dependency" - verb-mediated relations (met, discussed, attended, signed)
+  #                from spaCy's dependency parse, which we already compute.
+  extractors:
+    - pattern
+    - dependency
+  # Confidence floor applied after deduplication. Raise to trade recall for
+  # precision; Phase 10 will tell you where to actually set this.
+  min_confidence: 0.35
+
+entity_resolution:
+  # Context embeddings. Turn off for a fast, string-and-attribute-only run.
+  use_embeddings: true
+  embedding_model: intfloat/multilingual-e5-small
+  # Decision bands. Deliberately conservative: a FALSE MERGE fuses two real
+  # people permanently and corrupts every downstream fact, while a false split
+  # only costs recall and is recoverable. Pairs between the two thresholds go
+  # to a human review queue instead of being forced into a decision.
+  match_threshold: 0.55
+  review_threshold: 0.35
+
 logging:
   level: INFO
   # "rich" for colourised human-readable console logs, "json" for machine-

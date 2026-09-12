@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Any, Literal, Sequence
 
 from pydantic import BaseModel, Field, computed_field, field_validator
 
@@ -172,6 +172,17 @@ class Mention(BaseModel):
     extractor: str = "unknown"
     model_version: str = ""
 
+    # Filled by Phase 4. The back-reference from an entity mention to its
+    # within-document coreference cluster.
+    #
+    # We store the link in BOTH directions (here, and CorefMention.ner_mention_id)
+    # because the two stages ask opposite questions:
+    #   Phase 5 has a mention and asks "what does this resolve to?"  -> this field
+    #   A UI has a cluster and asks "which entities are in it?"      -> the other
+    # The cost of bidirectional links is that they can disagree, so they are
+    # written in one place (the coref pipeline) and never edited separately.
+    coref_cluster_id: str | None = None
+
     @property
     def length(self) -> int:
         return self.end - self.start
@@ -224,8 +235,14 @@ class Document(BaseModel):
     sentences: list[Sentence] = Field(default_factory=list)
 
     # Filled by Phase 3. The Document is an ANNOTATION CONTAINER that grows as
-    # the pipeline runs: Phase 4 will add coref_clusters, Phase 5 relations.
+    # the pipeline runs: Phase 5 will add relations.
     mentions: list[Mention] = Field(default_factory=list)
+
+    # Filled by Phase 4. Note these are WITHIN-DOCUMENT clusters only.
+    coref_clusters: list[CorefCluster] = Field(default_factory=list)
+
+    # Filled by Phase 5.
+    relations: list[Relation] = Field(default_factory=list)
 
     # Bookkeeping so we can tell which code produced this artifact.
     pipeline_version: str = "0.1.0"
@@ -253,6 +270,256 @@ class Document(BaseModel):
             if sentence.start <= char_index < sentence.end:
                 return sentence
         return None
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 -- coreference resolution
+# ---------------------------------------------------------------------------
+
+# How a mention refers to its entity. Difficulty increases down the list, and
+# the distinction drives which mention we pick to REPRESENT a cluster.
+MentionForm = Literal[
+    "NAMED",        # "Narendra Modi", "Modi"        -- contains the name
+    "NOMINAL",      # "The Indian Prime Minister"    -- a description
+    "PRONOMINAL",   # "He", "his", "they"            -- carries almost no info
+]
+
+PRONOUNS: frozenset[str] = frozenset(
+    {
+        "i", "me", "my", "mine", "myself",
+        "you", "your", "yours", "yourself", "yourselves",
+        "he", "him", "his", "himself",
+        "she", "her", "hers", "herself",
+        "it", "its", "itself",
+        "we", "us", "our", "ours", "ourselves",
+        "they", "them", "their", "theirs", "themselves",
+        "who", "whom", "whose", "which", "that", "this", "these", "those",
+    }
+)
+
+
+def classify_mention_form(surface: str) -> str:
+    """Classify a mention's surface form as NAMED, NOMINAL or PRONOMINAL.
+
+    A deliberately simple heuristic. What it can and cannot do:
+      * PRONOMINAL is reliable -- pronouns are a small closed set.
+      * NAMED vs NOMINAL keys off a LEADING DETERMINER first, and only then on
+        capitalisation.
+
+    Why the determiner and not capitalisation alone: news style capitalises
+    role titles, so "The Indian Prime Minister" is fully capitalised and a
+    capitalisation test calls it a name. But a definite description begins with
+    "the" and a personal name essentially never does. Checking the determiner
+    first fixes exactly the case this pipeline cares about most.
+
+    Known cost of this rule: organisations whose name includes the article
+    ("The Hindu") are classified NOMINAL. That is acceptable here, because the
+    only consumer is representative selection, where a determiner-initial
+    phrase is a worse representative than the bare name anyway.
+    """
+    stripped = surface.strip()
+    if not stripped:
+        return "NOMINAL"
+    if stripped.lower() in PRONOUNS:
+        return "PRONOMINAL"
+
+    words = stripped.split()
+    if words[0].lower() in {"the", "a", "an", "this", "that", "these", "those"}:
+        return "NOMINAL"
+
+    # A name is a run of capitalised tokens, allowing internal lowercase
+    # particles such as "da" in "Luiz Inacio Lula da Silva".
+    capitalised = sum(1 for w in words if w[:1].isupper())
+    return "NAMED" if capitalised >= max(1, len(words) - 1) else "NOMINAL"
+
+
+class CorefMention(BaseModel):
+    """One mention inside a coreference cluster.
+
+    WHY THIS IS NOT JUST A ``Mention``
+    ----------------------------------
+    Coreference generates its OWN candidate spans and needs mentions that NER
+    never produces: "He", "the airport", "the two leaders". Reusing ``Mention``
+    would force us to invent an entity ``label`` for every pronoun, which is
+    meaningless. So this is a lighter object, and ``ner_mention_id`` is the
+    optional bridge back to a Phase 3 entity mention when the spans align.
+    """
+
+    start: int
+    end: int
+    text: str
+    form: str = "NOMINAL"
+    # Set when this coref span aligns with a Phase 3 NER mention. None for
+    # pronouns and for nominals that NER did not consider entities.
+    ner_mention_id: str | None = None
+
+
+class CorefCluster(BaseModel):
+    """A set of mentions in ONE document that refer to the same thing.
+
+    A cluster is a WITHIN-DOCUMENT entity. It is NOT a real-world entity --
+    that is Phase 6's job. Article A's "Modi" cluster and Article B's "Modi"
+    cluster are two separate clusters until entity resolution merges them.
+    """
+
+    cluster_id: str
+    article_id: str
+    mentions: list[CorefMention] = Field(default_factory=list)
+    # Index into ``mentions`` of the span that best NAMES this cluster. This is
+    # the value downstream stages actually consume -- never a rewritten string.
+    representative_index: int = 0
+    score: float = 1.0
+    method: str = "unknown"
+
+    @property
+    def representative(self) -> CorefMention | None:
+        if not self.mentions:
+            return None
+        index = min(self.representative_index, len(self.mentions) - 1)
+        return self.mentions[index]
+
+    @property
+    def representative_text(self) -> str:
+        rep = self.representative
+        return rep.text if rep else ""
+
+    def spans(self) -> list[tuple[int, int]]:
+        return [(m.start, m.end) for m in self.mentions]
+
+
+def choose_representative(mentions: Sequence[CorefMention]) -> int:
+    """Pick the mention that best names a cluster.
+
+    Preference order, and the reasoning behind it:
+      1. NAMED over NOMINAL over PRONOMINAL -- "Narendra Modi" identifies the
+         referent; "He" identifies nothing outside this document.
+      2. Within the same form, the LONGEST span -- "Narendra Modi" carries more
+         identifying information than "Modi", which matters enormously in
+         Phase 6 where a full name is far easier to resolve than a surname.
+      3. Earliest position, as a deterministic tiebreak. Determinism is not
+         cosmetic: a non-deterministic representative would make the whole
+         pipeline produce different entity IDs on identical input.
+    """
+    if not mentions:
+        return 0
+    rank = {"NAMED": 0, "NOMINAL": 1, "PRONOMINAL": 2}
+    best = min(
+        range(len(mentions)),
+        key=lambda i: (
+            rank.get(mentions[i].form, 1),
+            -(mentions[i].end - mentions[i].start),
+            mentions[i].start,
+        ),
+    )
+    return best
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 -- relation extraction
+# ---------------------------------------------------------------------------
+
+# The relation schema. A CLOSED, controlled vocabulary, and that is deliberate:
+# if extractors were free to emit any verb they found, the graph would contain
+# "met", "meets", "had met", "held talks with" and "sat down with" as five
+# different edge types, and no query could find them all. Normalising to a
+# fixed set is what makes the graph queryable.
+#
+# The cost of a closed schema is coverage: a relation not in this list is
+# simply not extracted. That is the standard trade, and it is why an LLM (open
+# schema) is attractive when you genuinely cannot enumerate your relations.
+RelationType = Literal[
+    "holds_position",   # PERSON -> ROLE     "Prime Minister Narendra Modi"
+    "represents",       # PERSON -> COUNTRY  "the Indian Prime Minister"
+    "works_for",        # PERSON -> ORG      "Rousseff, who chairs the NDB"
+    "attended",         # PERSON -> EVENT    "Modi arrived for the BRICS Summit"
+    "met",              # PERSON -> PERSON|ORG
+    "discussed",        # PERSON -> TOPIC
+    "said",             # PERSON -> TOPIC
+    "located_in",       # EVENT|ORG -> LOCATION|COUNTRY
+    "signed",           # PERSON|ORG -> EVENT (agreements, declarations)
+]
+
+
+class Relation(BaseModel):
+    """One extracted fact: (subject) --predicate--> (object).
+
+    ARGUMENTS ARE MENTION IDS, NOT STRINGS
+    --------------------------------------
+    ``subject_mention_id`` points at a Mention, which points at a character
+    span, which points into the immutable document text. So every relation is
+    traceable to the exact words that produced it. If we stored plain strings
+    we would have a fact we could not defend -- and "Modi met Putin" sourced
+    from nowhere is not usable evidence.
+
+    The ``*_text`` fields are denormalised copies, kept for the same reason
+    Mention.text is: readable output, and the storage layer can work without
+    loading documents. Same drift risk, same verification.
+    """
+
+    relation_id: str
+    article_id: str
+
+    subject_mention_id: str
+    subject_text: str
+    subject_label: str
+
+    predicate: str
+
+    object_mention_id: str
+    object_text: str
+    object_label: str
+
+    # Where the fact was stated. Provenance is not optional: a knowledge graph
+    # whose facts cannot be traced back to a sentence is not auditable, and
+    # "show me why you believe this" is the first question anyone asks.
+    sentence_index: int = -1
+    evidence_start: int = -1
+    evidence_end: int = -1
+
+    confidence: float = 0.5
+    # How many times this same fact was stated in the article. Repetition is
+    # corroboration: a role asserted in three sentences is better supported
+    # than one mentioned in passing, and Phase 6 uses this when weighing
+    # conflicting claims about the same person.
+    evidence_count: int = 1
+    # Which component produced this: "pattern", "dependency", "llm", ...
+    extractor: str = "unknown"
+    # The surface verb/trigger that licensed the relation, before normalisation
+    # ("held talks with" -> predicate "met"). Kept for the same reason NER keeps
+    # raw_label: when output looks wrong, you need to see what actually matched.
+    trigger: str = ""
+
+    # True when an argument came from a coreference cluster representative
+    # rather than the literal text ("He" -> "Narendra Modi"). Worth flagging
+    # because these inherit the coref model's errors ON TOP of the parser's,
+    # so their confidence should be treated as lower.
+    subject_via_coref: bool = False
+    object_via_coref: bool = False
+
+    def evidence_in(self, document_text: str) -> str:
+        if self.evidence_start < 0:
+            return ""
+        return document_text[self.evidence_start : self.evidence_end]
+
+    def as_triple(self) -> str:
+        return f"({self.subject_text}) -[{self.predicate}]-> ({self.object_text})"
+
+
+def make_relation_id(
+    article_id: str,
+    subject_mention_id: str,
+    predicate: str,
+    object_mention_id: str,
+) -> str:
+    """Deterministic relation ID.
+
+    Same document + same argument spans + same predicate -> same ID, so
+    re-running extraction is idempotent and duplicate facts collapse instead of
+    accumulating. Hashed because the component IDs are long and the raw
+    concatenation would be unreadable in logs.
+    """
+    key = f"{article_id}|{subject_mention_id}|{predicate}|{object_mention_id}"
+    return f"rel_{hashlib.sha1(key.encode('utf-8')).hexdigest()[:12]}"
 
 
 # ---------------------------------------------------------------------------

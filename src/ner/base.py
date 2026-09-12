@@ -136,7 +136,10 @@ def trim_span(text: str, start: int, end: int) -> tuple[int, int]:
     Note we trim only characters that cannot begin or end a name. We do NOT
     strip interior punctuation: "U.S." and "Morgan Stanley Inc." need theirs.
     """
-    while start < end and (text[start].isspace() or text[start] in "\"'(-,"):
+    # A leading period is always junk: no name begins with one. This showed up
+    # as the mention ". Jaishankar" from "Dr. S. Jaishankar", which then became
+    # the subject of a relation.
+    while start < end and (text[start].isspace() or text[start] in "\"'(-,."):
         start += 1
     while end > start and (text[end - 1].isspace() or text[end - 1] in "\"')-,."):
         # Keep a trailing period that belongs to an abbreviation ("Inc.",

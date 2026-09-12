@@ -200,7 +200,18 @@ def _compile_alternation(phrases: Iterable[str]) -> re.Pattern[str]:
 
 _COUNTRY_RE = _compile_alternation(list(COUNTRIES) + list(COUNTRY_ALIASES))
 _DEMONYM_RE = _compile_alternation(DEMONYMS)
-_ROLE_RE = _compile_alternation(ROLE_TITLES)
+
+# Roles are matched CASE-INSENSITIVELY. News prose capitalises a title before a
+# name ("Prime Minister Modi") but lower-cases it in apposition ("Mukesh
+# Ambani, chairman of Reliance"). A case-sensitive pattern silently missed
+# every appositive role, which cost us the whole works_for relation family.
+#
+# Countries and demonyms stay case-SENSITIVE on purpose: lower-casing them
+# would match "us" as the United States and "turkey" as the country.
+_ROLE_RE = re.compile(
+    r"\b(?:" + "|".join(re.escape(p) for p in ROLE_TITLES) + r")\b",
+    re.IGNORECASE,
+)
 
 
 def canonical_country(surface: str) -> str | None:

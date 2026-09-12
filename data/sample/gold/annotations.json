@@ -1,0 +1,597 @@
+{
+  "_README": [
+    "MANUALLY LABELLED GOLD STANDARD for Phase 10 evaluation.",
+    "",
+    "Three articles, chosen because they cover the hardest cases in the corpus:",
+    "  art_fe7715c7a134 - alias variety + pronoun + nominal coreference",
+    "  art_8fc2b35b4aa3 - two similar Russian names, a quote, a paragraph break",
+    "  art_5488f6656604 - the Lalit Modi false-merge trap",
+    "",
+    "SPANS ARE IDENTIFIED BY (sentence, surface, occurrence), NOT by raw character",
+    "offsets. Offsets are resolved at load time. This is deliberate: hand-written",
+    "character offsets rot the moment preprocessing changes by one character, and a",
+    "gold set nobody can maintain is a gold set nobody updates.",
+    "",
+    "HONEST CAVEAT: these labels were produced by one annotator (the system's own",
+    "author), which is the weakest possible annotation setup. Real evaluation needs",
+    "at least two independent annotators and an inter-annotator agreement score",
+    "(Cohen's kappa) to establish that the task is even well-defined. Where human",
+    "annotators disagree, no model can be scored meaningfully. Treat these numbers",
+    "as a development signal, not as a published benchmark.",
+    "",
+    "REVISION 2: the first evaluation run exposed GOLD GAPS -- correct system output scored as false positives purely because the annotation was incomplete (dates, a topic, a country, and all ORG entity links). This is the normal way a gold set is built: you run it, inspect the 'errors', and find that some of them are yours. Numbers before this revision were pessimistic about the system and flattering about the annotation."
+  ],
+  "entities": {
+    "_comment": "Gold cross-document entity clusters. E_NARENDRA and E_LALIT being separate is the single most important assertion in this file.",
+    "E_NARENDRA": [
+      "Narendra Modi",
+      "Modi",
+      "Mr. Modi",
+      "PM Modi",
+      "Prime Minister Modi"
+    ],
+    "E_LALIT": [
+      "Lalit Modi"
+    ],
+    "E_PUTIN": [
+      "Vladimir Putin",
+      "Putin"
+    ],
+    "E_XI": [
+      "Xi Jinping",
+      "Xi"
+    ],
+    "E_JAISHANKAR": [
+      "S. Jaishankar",
+      "Jaishankar"
+    ],
+    "E_LAVROV": [
+      "Sergey Lavrov",
+      "Lavrov"
+    ],
+    "E_RYABKOV": [
+      "Sergei Ryabkov"
+    ],
+    "E_IPL": [
+      "Indian Premier League",
+      "IPL"
+    ],
+    "E_BCCI": [
+      "Board of Control for Cricket in India",
+      "BCCI"
+    ],
+    "E_BRICS": [
+      "BRICS"
+    ]
+  },
+  "articles": {
+    "art_fe7715c7a134": {
+      "mentions": [
+        {
+          "sent": 0,
+          "text": "Modi",
+          "label": "PERSON"
+        },
+        {
+          "sent": 0,
+          "text": "Kazan",
+          "label": "LOCATION"
+        },
+        {
+          "sent": 0,
+          "text": "BRICS Summit",
+          "label": "EVENT"
+        },
+        {
+          "sent": 1,
+          "text": "Prime Minister",
+          "label": "ROLE"
+        },
+        {
+          "sent": 1,
+          "text": "Narendra Modi",
+          "label": "PERSON"
+        },
+        {
+          "sent": 1,
+          "text": "Kazan",
+          "label": "LOCATION"
+        },
+        {
+          "sent": 1,
+          "text": "Tuesday",
+          "label": "DATE"
+        },
+        {
+          "sent": 1,
+          "text": "16th BRICS Summit",
+          "label": "EVENT"
+        },
+        {
+          "sent": 2,
+          "text": "Russian",
+          "label": "MISC"
+        },
+        {
+          "sent": 3,
+          "text": "Indian",
+          "label": "MISC"
+        },
+        {
+          "sent": 3,
+          "text": "Prime Minister",
+          "label": "ROLE"
+        },
+        {
+          "sent": 3,
+          "text": "President",
+          "label": "ROLE"
+        },
+        {
+          "sent": 3,
+          "text": "Vladimir Putin",
+          "label": "PERSON"
+        },
+        {
+          "sent": 4,
+          "text": "Modi",
+          "label": "PERSON"
+        },
+        {
+          "sent": 4,
+          "text": "Chinese",
+          "label": "MISC"
+        },
+        {
+          "sent": 4,
+          "text": "President",
+          "label": "ROLE"
+        },
+        {
+          "sent": 4,
+          "text": "Xi Jinping",
+          "label": "PERSON"
+        },
+        {
+          "sent": 5,
+          "text": "New Delhi",
+          "label": "LOCATION"
+        }
+      ],
+      "coref_clusters": [
+        [
+          {
+            "sent": 0,
+            "text": "Modi"
+          },
+          {
+            "sent": 1,
+            "text": "Narendra Modi"
+          },
+          {
+            "sent": 2,
+            "text": "He"
+          },
+          {
+            "sent": 3,
+            "text": "The Indian Prime Minister"
+          },
+          {
+            "sent": 4,
+            "text": "Modi"
+          }
+        ],
+        [
+          {
+            "sent": 0,
+            "text": "Kazan"
+          },
+          {
+            "sent": 1,
+            "text": "Kazan"
+          }
+        ],
+        [
+          {
+            "sent": 0,
+            "text": "BRICS Summit"
+          },
+          {
+            "sent": 1,
+            "text": "16th BRICS Summit"
+          }
+        ]
+      ],
+      "relations": [
+        {
+          "subject": "Narendra Modi",
+          "predicate": "holds_position",
+          "object": "Prime Minister"
+        },
+        {
+          "subject": "Narendra Modi",
+          "predicate": "represents",
+          "object": "India"
+        },
+        {
+          "subject": "Narendra Modi",
+          "predicate": "attended",
+          "object": "BRICS Summit"
+        },
+        {
+          "subject": "Narendra Modi",
+          "predicate": "met",
+          "object": "Vladimir Putin"
+        },
+        {
+          "subject": "Narendra Modi",
+          "predicate": "met",
+          "object": "Xi Jinping"
+        },
+        {
+          "subject": "Vladimir Putin",
+          "predicate": "holds_position",
+          "object": "President"
+        },
+        {
+          "subject": "Xi Jinping",
+          "predicate": "holds_position",
+          "object": "President"
+        },
+        {
+          "subject": "Xi Jinping",
+          "predicate": "represents",
+          "object": "China"
+        }
+      ],
+      "entity_links": [
+        {
+          "text": "Modi",
+          "entity": "E_NARENDRA"
+        },
+        {
+          "text": "Narendra Modi",
+          "entity": "E_NARENDRA"
+        },
+        {
+          "text": "Vladimir Putin",
+          "entity": "E_PUTIN"
+        },
+        {
+          "text": "Xi Jinping",
+          "entity": "E_XI"
+        }
+      ]
+    },
+    "art_8fc2b35b4aa3": {
+      "mentions": [
+        {
+          "sent": 0,
+          "text": "Jaishankar",
+          "label": "PERSON"
+        },
+        {
+          "sent": 0,
+          "text": "Lavrov",
+          "label": "PERSON"
+        },
+        {
+          "sent": 1,
+          "text": "External Affairs Minister",
+          "label": "ROLE"
+        },
+        {
+          "sent": 1,
+          "text": "S. Jaishankar",
+          "label": "PERSON"
+        },
+        {
+          "sent": 1,
+          "text": "Russian",
+          "label": "MISC"
+        },
+        {
+          "sent": 1,
+          "text": "Foreign Minister",
+          "label": "ROLE"
+        },
+        {
+          "sent": 1,
+          "text": "Sergey Lavrov",
+          "label": "PERSON"
+        },
+        {
+          "sent": 1,
+          "text": "Kazan",
+          "label": "LOCATION"
+        },
+        {
+          "sent": 1,
+          "text": "Thursday",
+          "label": "DATE"
+        },
+        {
+          "sent": 2,
+          "text": "Jaishankar",
+          "label": "PERSON"
+        },
+        {
+          "sent": 2,
+          "text": "Deputy Foreign Minister",
+          "label": "ROLE"
+        },
+        {
+          "sent": 2,
+          "text": "Sergei Ryabkov",
+          "label": "PERSON"
+        },
+        {
+          "sent": 3,
+          "text": "New Delhi",
+          "label": "LOCATION"
+        },
+        {
+          "sent": 2,
+          "text": "connectivity",
+          "label": "TOPIC"
+        }
+      ],
+      "coref_clusters": [
+        [
+          {
+            "sent": 0,
+            "text": "Jaishankar"
+          },
+          {
+            "sent": 1,
+            "text": "S. Jaishankar"
+          },
+          {
+            "sent": 2,
+            "text": "Jaishankar"
+          }
+        ],
+        [
+          {
+            "sent": 0,
+            "text": "Lavrov"
+          },
+          {
+            "sent": 1,
+            "text": "Sergey Lavrov"
+          }
+        ],
+        [
+          {
+            "sent": 2,
+            "text": "Sergei Ryabkov"
+          },
+          {
+            "sent": 3,
+            "text": "He"
+          }
+        ]
+      ],
+      "relations": [
+        {
+          "subject": "S. Jaishankar",
+          "predicate": "holds_position",
+          "object": "External Affairs Minister"
+        },
+        {
+          "subject": "S. Jaishankar",
+          "predicate": "met",
+          "object": "Sergey Lavrov"
+        },
+        {
+          "subject": "Sergey Lavrov",
+          "predicate": "holds_position",
+          "object": "Foreign Minister"
+        },
+        {
+          "subject": "Sergey Lavrov",
+          "predicate": "represents",
+          "object": "Russia"
+        },
+        {
+          "subject": "Sergei Ryabkov",
+          "predicate": "holds_position",
+          "object": "Deputy Foreign Minister"
+        }
+      ],
+      "entity_links": [
+        {
+          "text": "Jaishankar",
+          "entity": "E_JAISHANKAR"
+        },
+        {
+          "text": "S. Jaishankar",
+          "entity": "E_JAISHANKAR"
+        },
+        {
+          "text": "Lavrov",
+          "entity": "E_LAVROV"
+        },
+        {
+          "text": "Sergey Lavrov",
+          "entity": "E_LAVROV"
+        },
+        {
+          "text": "Sergei Ryabkov",
+          "entity": "E_RYABKOV"
+        }
+      ]
+    },
+    "art_5488f6656604": {
+      "mentions": [
+        {
+          "sent": 0,
+          "text": "Lalit Modi",
+          "label": "PERSON"
+        },
+        {
+          "sent": 0,
+          "text": "London",
+          "label": "LOCATION"
+        },
+        {
+          "sent": 1,
+          "text": "Indian Premier League",
+          "label": "ORG"
+        },
+        {
+          "sent": 1,
+          "text": "chairman",
+          "label": "ROLE"
+        },
+        {
+          "sent": 1,
+          "text": "Lalit Modi",
+          "label": "PERSON"
+        },
+        {
+          "sent": 1,
+          "text": "London",
+          "label": "LOCATION"
+        },
+        {
+          "sent": 1,
+          "text": "Board of Control for Cricket in India",
+          "label": "ORG"
+        },
+        {
+          "sent": 2,
+          "text": "Modi",
+          "label": "PERSON"
+        },
+        {
+          "sent": 2,
+          "text": "London",
+          "label": "LOCATION"
+        },
+        {
+          "sent": 3,
+          "text": "BCCI",
+          "label": "ORG"
+        },
+        {
+          "sent": 4,
+          "text": "Lalit Modi",
+          "label": "PERSON"
+        },
+        {
+          "sent": 4,
+          "text": "IPL",
+          "label": "ORG"
+        },
+        {
+          "sent": 2,
+          "text": "2010",
+          "label": "DATE"
+        },
+        {
+          "sent": 4,
+          "text": "2008",
+          "label": "DATE"
+        },
+        {
+          "sent": 1,
+          "text": "India",
+          "label": "COUNTRY"
+        }
+      ],
+      "coref_clusters": [
+        [
+          {
+            "sent": 0,
+            "text": "Lalit Modi"
+          },
+          {
+            "sent": 1,
+            "text": "Lalit Modi"
+          },
+          {
+            "sent": 2,
+            "text": "Modi"
+          },
+          {
+            "sent": 4,
+            "text": "Lalit Modi"
+          }
+        ],
+        [
+          {
+            "sent": 0,
+            "text": "London"
+          },
+          {
+            "sent": 1,
+            "text": "London"
+          },
+          {
+            "sent": 2,
+            "text": "London"
+          }
+        ],
+        [
+          {
+            "sent": 1,
+            "text": "Board of Control for Cricket in India"
+          },
+          {
+            "sent": 3,
+            "text": "BCCI"
+          }
+        ],
+        [
+          {
+            "sent": 1,
+            "text": "Indian Premier League"
+          },
+          {
+            "sent": 4,
+            "text": "IPL"
+          }
+        ]
+      ],
+      "relations": [
+        {
+          "subject": "Lalit Modi",
+          "predicate": "holds_position",
+          "object": "chairman"
+        },
+        {
+          "subject": "Lalit Modi",
+          "predicate": "works_for",
+          "object": "Indian Premier League"
+        }
+      ],
+      "entity_links": [
+        {
+          "text": "Lalit Modi",
+          "entity": "E_LALIT"
+        },
+        {
+          "text": "Modi",
+          "entity": "E_LALIT"
+        },
+        {
+          "text": "Indian Premier League",
+          "entity": "E_IPL"
+        },
+        {
+          "text": "IPL",
+          "entity": "E_IPL"
+        },
+        {
+          "text": "Board of Control for Cricket in India",
+          "entity": "E_BCCI"
+        },
+        {
+          "text": "BCCI",
+          "entity": "E_BCCI"
+        }
+      ]
+    }
+  }
+}
