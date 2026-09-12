@@ -1,0 +1,24 @@
+# FULL profile — transformer NER + neural coreference + embeddings.
+#
+# Needs ~4.5 GB RAM and ~2.5 GB of model downloads.
+# Will NOT fit Streamlit Community Cloud (1 GB). Use HuggingFace Spaces
+# (16 GB free on CPU basic) or any host with >=6 GB.
+
+-r requirements.txt
+
+# CPU wheels. Swap the index URL for a CUDA build if you have a GPU --
+# coreference goes from ~13 s/doc to ~0.3 s/doc, which is the single largest
+# available speedup (it is ~94% of pipeline runtime).
+--extra-index-url https://download.pytorch.org/whl/cpu
+# torch MUST be one of ZeroGPU's supported versions or the Space fails with
+# CONFIG_ERROR before it even builds -- and it validates this even when the
+# app never calls the GPU. Supported at time of writing:
+#   2.13.0, 2.12.1, 2.11.0, 2.10.0, 2.9.1, 2.8.0
+torch==2.12.1
+transformers==4.49.0
+
+# Neural coreference (LingMess, 590M params).
+# Chosen because it installs with ZERO changes to an existing torch pinning --
+# which matters a great deal when a coref library would otherwise dictate your
+# torch version.
+fastcoref==2.1.6

@@ -1,0 +1,14 @@
+[server]
+# Uploads are small (text), so the default 200 MB limit is unnecessary.
+maxUploadSize = 20
+# Streamlit's file watcher walks site-packages and trips over torch's custom
+# module machinery, producing spurious reload errors. We only edit our own
+# code, so polling the project directory is enough.
+fileWatcherType = "poll"
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#2563eb"

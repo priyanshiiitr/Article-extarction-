@@ -1,0 +1,29 @@
+# LITE profile — deployable on Streamlit Community Cloud (1 GB RAM).
+#
+# Deliberately EXCLUDES torch/transformers/fastcoref (~2.5 GB). The pipeline
+# imports those lazily inside the components that need them, so lite mode never
+# touches them and the whole install stays around 200 MB.
+#
+# For the FULL profile use: pip install -r requirements-full.txt
+
+# Core
+pydantic>=2.6,<=2.12.5
+PyYAML==6.0.3
+python-dotenv==1.0.1
+rich==13.9.4
+rapidfuzz==3.14.5
+numpy==1.26.4
+pandas==2.2.3
+
+# NLP (lite): spaCy handles segmentation, NER and the dependency parse
+spacy==3.8.7
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+
+# Web article extraction
+trafilatura==2.2.0
+# REQUIRED: lxml.html.clean moved out of lxml into its own package. Without it
+# trafilatura fails to import with a misleading error.
+lxml_html_clean==0.4.2
+
+# UI
+streamlit==1.63.0

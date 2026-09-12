@@ -82,6 +82,15 @@ _PUNCTUATION_FOLD = {
     " ": " ",   # thin space
 }
 
+# Reference markers: "[1]", "[a]", "[citation needed]", "[note 2]".
+# Encyclopaedic sources and some news sites embed these inline, and they attach
+# themselves to entity spans -- we extracted "Narendra Damodardas Modi[a" as a
+# PERSON from a live Wikipedia page. Removed BEFORE whitespace collapsing so the
+# gap they leave behind is tidied in the same pass.
+_CITATION_RE = re.compile(
+    r"\[(?:\d{1,3}|[a-z]|citation needed|note \d+)\]", re.IGNORECASE
+)
+
 _MULTI_SPACE_RE = re.compile(r"[ \t\r\f\v]+")
 _MULTI_NEWLINE_RE = re.compile(r"\n{3,}")
 _SPACE_AROUND_NEWLINE_RE = re.compile(r"[ \t]*\n[ \t]*")
@@ -160,6 +169,7 @@ def clean_text(raw: str, strip_html_markup: bool = True, unicode_form: str = "NF
         text = strip_html(text)
     text = normalize_unicode(text, unicode_form)
     text = fold_punctuation(text)
+    text = _CITATION_RE.sub("", text)
     text = normalize_whitespace(text)
     return text
 

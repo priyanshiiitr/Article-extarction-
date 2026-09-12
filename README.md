@@ -1,5 +1,9 @@
 # News Knowledge Graph
 
+**▶ Live demo: [huggingface.co/spaces/priyanshiiitr/news-knowledge-graph](https://huggingface.co/spaces/priyanshiiitr/news-knowledge-graph)**
+
+[![Open in Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/priyanshiiitr/news-knowledge-graph)
+
 Extract structured information — people, organizations, countries, events, roles,
 relations — from news articles, resolve mentions into canonical entities across
 articles, and store the result as a queryable knowledge graph.
@@ -7,6 +11,10 @@ articles, and store the result as a queryable knowledge graph.
 Built as a teaching project: every design decision is documented in the module
 docstrings, including the tradeoffs and the things that are deliberately only a
 baseline.
+
+> In the demo: **Ingest → Use sample corpus → Run pipeline → Query `PM Modi`**.
+> The run summary reports which components actually loaded, so a degraded run is
+> never mistaken for a fast one.
 
 ---
 
@@ -29,6 +37,7 @@ articles → ingestion → preprocessing → NER → coreference → relations
 | 7–9. Storage + query | done | `src/storage/` |
 | 10. Evaluation | done | `src/evaluation/` |
 | 11. Production architecture | done | [`docs/PRODUCTION.md`](docs/PRODUCTION.md) |
+| UI dashboard | done | [`app.py`](app.py) — [live on Spaces](https://huggingface.co/spaces/priyanshiiitr/news-knowledge-graph) |
 
 ### The two ideas that hold it together
 
@@ -96,6 +105,56 @@ python scripts/query.py "Lalit Modi"    # any entity, by name or alias
 python scripts/evaluate.py             # scores against the gold set
 pytest -q
 ```
+
+---
+
+## Dashboard
+
+**Deployed:** https://huggingface.co/spaces/priyanshiiitr/news-knowledge-graph
+
+Run it locally with:
+
+```bash
+python app.py            # Gradio — this is the deployed entry point
+```
+
+Opens on http://localhost:7860 with six tabs:
+
+| Tab | What it does |
+|---|---|
+| **Ingest** | Paste article URLs (extracted with trafilatura), paste raw text, or load the sample corpus |
+| **Run pipeline** | Runs all six stages with live progress, then shows where the time went |
+| **Entities** | Browse canonical entities with aliases, roles, countries and their relations |
+| **Query** | Search by *any alias* — "PM Modi" finds "Narendra Modi" — with a relation tree and provenance |
+| **Review queue** | Entity pairs the resolver would not decide automatically, side by side |
+| **Evaluation** | Scores the run against the gold standard |
+
+### Two resource profiles
+
+Selectable on the **Run pipeline** tab. **Config only — no code differs between them.**
+
+| | `lite` | `full` |
+|---|---|---|
+| NER | spaCy + gazetteer | + BERT transformer |
+| Coreference | rule-based | LingMess neural (590M) |
+| ER embeddings | off | e5-small |
+| RAM | ~0.6 GB | ~4.5 GB |
+| Speed | <1 s/article | ~4-14 s/article (CPU, depends on free RAM) |
+
+`lite` exists for hosts with tight memory limits. Its
+measured cost: no nominal coreference, and `NDB` stays separate from
+`New Development Bank`.
+
+**No API keys are required.** All models are public on HuggingFace and download
+anonymously; there is no LLM in the pipeline.
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The live Space runs the **full**
+profile on HuggingFace's free tier.
+
+> Note: HuggingFace dropped Streamlit as a Space SDK (`gradio`, `docker` and
+> `static` only), so `app.py` (Gradio) is the deployed entry point.
+> `app/streamlit_app.py` is kept for Streamlit Community Cloud but is no
+> longer the primary UI.
 
 ---
 
@@ -170,6 +229,12 @@ src/evaluation/evaluate.py scoring against the gold set
 
 data/sample/gold/         manually labelled gold standard (3 articles)
 docs/PRODUCTION.md        Phase 11: scaling, LLM usage, what to build next
+docs/DEPLOYMENT.md        hosting options and the RAM maths
+
+src/ingestion/web.py      URL -> Article via trafilatura
+src/pipeline/runner.py    in-memory orchestrator with progress + profiles
+app.py                    the Gradio dashboard (deployed entry point)
+app/streamlit_app.py      legacy Streamlit UI (Streamlit Cloud only)
 
 scripts/                  runnable entry points
 tests/                    175 tests

@@ -19,3 +19,6 @@ data/processed/*
 *.db
 *.sqlite3
 .models_cache/
+
+# Generated Space deployment folder (its own git repo)
+build/
